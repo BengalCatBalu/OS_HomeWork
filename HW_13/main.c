@@ -28,6 +28,7 @@ int main() {
     fclose(file);
 
     // Генерация символьных связей и проверка открытия файлов
+    // Генерация символьных связей и проверка открытия файлов
     while (depth < MAX_DEPTH) {
         snprintf(link_name, sizeof(link_name), link_format, 'a' + depth, 'a' + depth);
         snprintf(next_link_name, sizeof(next_link_name), link_format, 'a' + depth, 'a' + depth + 1);
