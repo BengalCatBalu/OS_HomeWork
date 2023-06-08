@@ -1,46 +1,48 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <unistd.h>
 
-int received_number = 0; // Принятое число
-int bit_index = 0; // Индекс текущего бита для приема
+int sendpid;
+int number = 0;
 
-// Обработчик сигналов SIGUSR1 и SIGUSR2
-void sigusr_handler(int signum) {
-    if (signum == SIGUSR1) {
-        // Принят бит 0
-        received_number |= (0 << bit_index);
-    } else if (signum == SIGUSR2) {
-        // Принят бит 1
-        received_number |= (1 << bit_index);
-    }
+int step = 0;
+void getFirst() {
+  ++step;
 
-    // Подтверждение принятия бита с помощью SIGUSR1
-    kill(getpid(), SIGUSR1);
-
-    bit_index++;
-
-    if (bit_index == 32) {
-        // Печать принятого числа
-        printf("Принятое число: %d\n", received_number);
-
-        // Завершение работы
-        exit(0);
-    }
+  if (step == 32) {
+    printf("Результат: %d \n", number);
+    exit(0);
+  } else {
+    printf("Получен %d бит: %d \n", step, 0);
+    kill(sendpid, SIGUSR1);
+  }
 }
 
-int main() {
-    printf("Программа-приемник (PID: %d)\n", getpid());
+void getSecond() {
+  number += (1 << step);
+  ++step;
 
-    // Установка обработчика сигналов SIGUSR1 и SIGUSR2
-    signal(SIGUSR1, sigusr_handler);
-    signal(SIGUSR2, sigusr_handler);
-
-    // Ожидание сигналов
-    while (1) {
-        sleep(1);
-    }
-
-    return 0;
+  if (step == 32) {
+    printf("Результат: %d \n", number);
+    exit(0);
+  } else {
+    printf("Получен %d бит: %d \n", step, 1);
+    kill(sendpid, SIGUSR1);
+  }
 }
+
+int main(void) {
+  (void)signal(SIGUSR1, getFirst);
+  (void)signal(SIGUSR2, getSecond);
+
+  printf("Receiver PID: %d \n", getpid());
+
+  printf("Sender PID: ");
+  scanf("%d", &sendpid);
+
+  while(1) {};
+}
+
+
+

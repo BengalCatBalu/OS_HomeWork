@@ -6,7 +6,7 @@
 			[
 				{
 					"build" : ".",
-					"jsonFile" : "directory-.-UBSAN-f5ebdc15457944623624.json",
+					"jsonFile" : "directory-.-Release-f5ebdc15457944623624.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.24"
@@ -19,7 +19,7 @@
 					]
 				}
 			],
-			"name" : "UBSAN",
+			"name" : "Release",
 			"projects" : 
 			[
 				{
@@ -39,7 +39,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "HW_10::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-HW_10-UBSAN-239b7223e363b15e7cea.json",
+					"jsonFile" : "target-HW_10-Release-87b0a2efc35ad57a9bf3.json",
 					"name" : "HW_10",
 					"projectIndex" : 0
 				}
@@ -49,7 +49,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/Users/efimovivan/Desktop/OS_Homework3/OS_HomeWork/HW_10/cmake-build-ubsan",
+		"build" : "/Users/efimovivan/Desktop/OS_Homework3/OS_HomeWork/HW_10/cmake-build-release",
 		"source" : "/Users/efimovivan/Desktop/OS_Homework3/OS_HomeWork/HW_10"
 	},
 	"version" : 

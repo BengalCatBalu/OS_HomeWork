@@ -6,96 +6,77 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
-#define PIPE_READ_END 0
-#define PIPE_WRITE_END 1
-#define MESSAGE_COUNT 10
+#define MESSAGE_LIMIT 10
 
 int main() {
-    int pipefd[2]; // Дескрипторы для канала
-    pid_t pid;
-    sem_t *sem; // Семафор для синхронизации
+    int pipefd[2]; // Массив для файловых дескрипторов канала
+    sem_t *sem; // Семафор для синхронизации обмена сообщениями
 
-    // Создание канала
+    // Создание неименованного канала
     if (pipe(pipefd) == -1) {
-        perror("pipe");
-        exit(1);
+        perror("Ошибка при создании канала");
+        exit(EXIT_FAILURE);
     }
+
+    sem_unlink("/my_semaphore"); // Удаление семафора, если он уже существует
 
     // Создание семафора
     sem = sem_open("/my_semaphore", O_CREAT | O_EXCL, 0666, 1);
     if (sem == SEM_FAILED) {
-        perror("sem_open");
-        exit(1);
+        perror("Ошибка при создании семафора");
+        exit(EXIT_FAILURE);
     }
 
-    // Создание дочернего процесса
-    pid = fork();
+    pid_t pid = fork(); // Создание дочернего процесса
+
     if (pid == -1) {
-        perror("fork");
-        exit(1);
-    }
+        perror("Ошибка при создании дочернего процесса");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // Код дочернего процесса
+        close(pipefd[1]); // Закрытие дескриптора записи в канал
 
-    if (pid == 0) {
-        // Дочерний процесс
+        for (int i = 0; i < MESSAGE_LIMIT; i++) {
+            char message[256];
 
-        close(pipefd[PIPE_READ_END]); // Закрытие ненужного конца канала
+            if (i % 2 == 1) {
+                sem_wait(sem); // Ожидание сигнала от родительского процесса
+                read(pipefd[0], message, sizeof(message));
+                printf("Дочерний процесс получил: %s\n", message);
+            }
 
-        // Циклический обмен сообщениями
-        for (int i = 0; i < MESSAGE_COUNT; i++) {
-            // Ожидание разрешения на запись
-            sem_wait(sem);
-
-            // Запись сообщения в канал
-            printf("Дочерний процесс отправляет сообщение: Message %d\n", i + 1);
-            write(pipefd[PIPE_WRITE_END], "Message", 7);
-
-            // Разрешение чтения родительскому процессу
-            sem_post(sem);
+            snprintf(message, sizeof(message), "Message %d from child process", i + 1);
+            printf("Дочерний процесс отправил: %s\n", message);
+            write(pipefd[1], message, sizeof(message));
+            sem_post(sem); // Отправка сигнала родительскому процессу
         }
 
-        close(pipefd[PIPE_WRITE_END]); // Закрытие конца канала для записи
-
-        // Удаление семафора
-        if (sem_unlink("/my_semaphore") == -1) {
-            perror("sem_unlink");
-            exit(1);
-        }
-
-
-
-        printf("Дочерний процесс завершился.\n");
+        close(pipefd[0]); // Закрытие дескриптора чтения из канала
+        sem_close(sem); // Закрытие семафора
+        exit(EXIT_SUCCESS);
     } else {
-        // Родительский процесс
+        // Код родительского процесса
+        close(pipefd[0]); // Закрытие дескриптора чтения из канала
 
-        close(pipefd[PIPE_WRITE_END]); // Закрытие ненужного конца канала
+        for (int i = 0; i < MESSAGE_LIMIT; i++) {
+            char message[256];
 
-        // Циклический обмен сообщениями
-        for (int i = 0; i < MESSAGE_COUNT; i++) {
-            // Ожидание разрешения на чтение
-            sem_wait(sem);
+            if (i % 2 == 0) {
+                snprintf(message, sizeof(message), "Message %d from parent process", i + 1);
+                printf("Родительский процесс отправил: %s\n", message);
+                write(pipefd[1], message, sizeof(message));
+            }
 
-            char buffer[8];
-            // Чтение сообщения из канала
-            read(pipefd[PIPE_READ_END], buffer, 7);
-            printf("Родительский процесс принял сообщение: %s %d\n", buffer, i + 1);
-
-            // Разрешение записи дочернему процессу
-            sem_post(sem);
+            sem_wait(sem); // Ожидание сигнала от дочернего процесса
+            read(pipefd[0], message, sizeof(message));
+            printf("Родительский процесс получил: %s\n", message);
+            sem_post(sem); // Отправка сигнала дочернему процессу
         }
 
-        close(pipefd[PIPE_READ_END]); // Закрытие конца канала для чтения
-
-        // Ожидание завершения дочернего процесса
-        wait(NULL);
-
-        // Удаление семафора
-        if (sem_unlink("/my_semaphore") == -1) {
-            perror("sem_unlink");
-            exit(1);
-        }
-
-        printf("Родительский процесс завершился.\n");
+        close(pipefd[1]); // Закрытие дескриптора записи в канал
+        sem_close(sem); // Закрытие семафора
+        wait(NULL); // Ожидание завершения дочернего процесса
+        exit(EXIT_SUCCESS);
     }
-
-    return 0;
 }
+
