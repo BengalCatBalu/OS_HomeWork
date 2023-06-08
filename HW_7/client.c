@@ -1,58 +1,49 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <time.h>
 
-#define SHM_NAME "/my_shared_memory"
-#define NUMBER_RANGE 100
-
-typedef struct {
-    int number;
-    int finished;
-} SharedData;
+#define SHM_SIZE 1024
 
 int main() {
-    int shm_fd;
-    SharedData *sharedData;
-    srand(time(NULL)); // Инициализация генератора случайных чисел
+    // Генерируем ключ для разделяемой памяти
+    key_t key = ftok("shared_memory_key", 1234);
 
-    // Получение доступа к разделяемой памяти
-    shm_fd = shm_open(SHM_NAME, O_RDWR, 0666);
-    if (shm_fd == -1) {
-        perror("shm_open");
-        exit(1);
+    // Получаем идентификатор сегмента разделяемой памяти
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    // Присоединяем сегмент к адресному пространству процесса
+    char *shm = (char *)shmat(shmid, NULL, 0);
+
+    // Инициализация генератора случайных чисел
+    srand(time(NULL));
+
+    // Генерация и запись случайных чисел в разделяемую память
+    int count = 0;
+    int total_numbers = 30;
+
+    while (count < total_numbers) {
+        // Генерация случайного числа
+        int number = rand() % 100;
+
+        // Запись числа в разделяемую память
+        sprintf(shm, "%d", number);
+
+        // Вывод информации об отправленном числе
+        printf("Send number: %d\n", number);
+        // Задержка в 3 секунды
+        sleep(3);
+
+        count++;
     }
 
-    // Отображение разделяемой памяти на адресное пространство клиента
-    sharedData = (SharedData *)mmap(NULL, sizeof(SharedData), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (sharedData == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
-    }
+    // Отсоединение сегмента разделяемой памяти
+    shmdt(shm);
 
-    printf("Генерация и отправка случайных чисел...\n");
-
-    // Цикл генерации случайных чисел и отправки их серверу
-    while (!sharedData->finished) {
-        if (sharedData->number == -1) {
-            int randomNum = rand() % NUMBER_RANGE;
-            sharedData->number = randomNum;
-            printf("Отправлено число: %d\n", randomNum);
-        }
-
-        usleep(100000); // Задержка для снижения нагрузки
-    }
-
-    // Отключение от разделяемой памяти
-    if (munmap(sharedData, sizeof(SharedData)) == -1) {
-        perror("munmap");
-        exit(1);
-    }
-
-    printf("Завершение работы клиента.\n");
+    printf("Client terminated\n");
 
     return 0;
 }

@@ -1,73 +1,52 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
-#define SHM_NAME "/my_shared_memory"
-
-typedef struct {
-    int number;
-    int finished;
-} SharedData;
+#define SHM_SIZE 1024
 
 int main() {
-    int shm_fd;
-    SharedData *sharedData;
+    // Генерируем ключ для разделяемой памяти
+    key_t key = ftok("shared_memory_key", 1234);
 
-    // Создание разделяемой памяти
-    shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-    if (shm_fd == -1) {
-        perror("shm_open");
-        exit(1);
-    }
+    // Создаем сегмент разделяемой памяти
+    int shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
 
-    // Определение размера разделяемой памяти
-    if (ftruncate(shm_fd, sizeof(SharedData)) == -1) {
-        perror("ftruncate");
-        exit(1);
-    }
+    // Присоединяем сегмент к адресному пространству процесса
+    char *shm = (char *)shmat(shmid, NULL, 0);
 
-    // Отображение разделяемой памяти на адресное пространство сервера
-    sharedData = (SharedData *)mmap(NULL, sizeof(SharedData), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (sharedData == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
-    }
+    // Инициализация переменных
+    int count = 0;
+    int total_numbers = 30;
 
-    printf("Ожидание данных от клиента...\n");
-
-    // Цикл чтения данных от клиента
-    while (!sharedData->finished) {
-        // Проверка наличия новых данных
-        if (sharedData->number != -1) {
-            printf("Получено число от клиента: %d\n", sharedData->number);
-            sharedData->number = -1; // Сброс значения числа
+    // Цикл чтения и вывода чисел из разделяемой памяти
+    while (count < total_numbers) {
+        // Ожидание появления нового числа в разделяемой памяти
+        while (shm[0] == '\0') {
+            sleep(1);
         }
 
-        usleep(100000); // Задержка для снижения нагрузки
+        // Чтение числа из разделяемой памяти
+        int number = atoi(shm);
+
+        // Вывод числа на экран
+        printf("Received number: %d\n", number);
+
+        // Обнуление разделяемой памяти
+        shm[0] = '\0';
+
+        count++;
     }
 
-    // Отключение от разделяемой памяти
-    if (munmap(sharedData, sizeof(SharedData)) == -1) {
-        perror("munmap");
-        exit(1);
-    }
+    // Отсоединение сегмента разделяемой памяти
+    shmdt(shm);
 
-    // Закрытие разделяемой памяти
-    if (close(shm_fd) == -1) {
-        perror("close");
-        exit(1);
-    }
+    // Удаление сегмента разделяемой памяти
+    shmctl(shmid, IPC_RMID, NULL);
 
-    // Удаление разделяемой памяти
-    if (shm_unlink(SHM_NAME) == -1) {
-        perror("shm_unlink");
-        exit(1);
-    }
-
-    printf("Завершение работы сервера.\n");
+    printf("Server terminated\n");
 
     return 0;
 }
