@@ -3,4 +3,4 @@ project(HW_12 C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(HW_12 server.c)
+add_executable(HW_12 sender.c)
